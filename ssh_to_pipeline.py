@@ -35,10 +35,11 @@ def install_packages() -> None:
     Path("/etc/apt/sources.list.d/ngrok.list").write_text(
         "deb https://ngrok-agent.s3.amazonaws.com buster main\n"
     )
-    check_call(["apt-get", "update"])
+    check_call(["apt-get", "-q", "update"])
     check_call(
         [
             "apt-get",
+            "-q",
             "install",
             "-y",
             "--no-install-recommends",
@@ -53,14 +54,18 @@ def fix_bitbucket_tty() -> None:
         f.write(
             "\n"
             "# Fix TTY set by bitbucket\n"
-            'if [[ "$SSH_TTY" == "$(readlink -f /dev/stdout)" ]]; then exec 1<&0 2<&0; fi\n'
+            'if [[ "$SSH_TTY" == "$(readlink -f /dev/stdin)" ]]; then exec 1<&0 2<&0; fi\n'
             "\n"
         )
 
 
 def start_ssh_server(ngrok_token: str) -> None:
     check_call(["ngrok", "config", "add-authtoken", ngrok_token])
-    Path("/run/sshd").mkdir(parents=True, exist_ok=True)
+    run_sshd = Path("/run/sshd")
+    run_sshd.mkdir(parents=True, exist_ok=True)
+    ROOT_UID = 0
+    os.chown(run_sshd, ROOT_UID, ROOT_UID)
+    run_sshd.chmod(0o755)
     with Popen(["/usr/sbin/sshd", "-D"]) as sshd:
         with Popen(
             "ngrok tcp 22 --log=stdout --log-format=json | tee /dev/stderr",
@@ -72,15 +77,21 @@ def start_ssh_server(ngrok_token: str) -> None:
             assert ngrok.stdout is not None  # for mypy
             while True:
                 line = ngrok.stdout.readline()
+                if sshd.poll() is not None:
+                    raise RuntimeError("sshd terminated unexpectedly")
                 if line == "":
                     break
                 d = json.loads(line)
+                # print(f"d = {d!r}", flush=True)
                 if d.get("msg") == "started tunnel":
                     url = d["url"]
                     m = re.match(r"^tcp://(.+):(\d+)$", url)
                     assert m is not None
                     host, port = m.groups()
-                    print(f"\n\nTo connect, run:\n\nssh -p {port} root@{host}\n\n\n")
+                    print(
+                        f"\n\nTunnel started. To connect, run:\n\nssh -p {port} root@{host}\n\n\n",
+                        flush=True,
+                    )
         # If ngrok exited, close sshd
         sshd.kill()
 
