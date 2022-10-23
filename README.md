@@ -27,20 +27,17 @@ ngrok, and when the connection is established, it will print something like this
 ```
 Tunnel started. To connect, run:
 
-ssh -p 12280 root@4.tcp.ngrok.io
+ssh -p 14169 root@0.tcp.eu.ngrok.io
+
+
+Tip: to get the environment of the pipeline, run this in the SSH session:
+
+cd /opt/atlassian/bitbucketci/agent/build; . <(xargs -0 bash -c 'printf "export %q\n" "$@"' -- < /proc/131/environ)
 ```
 
-Copy the command to your terminal, and you should be able to SSH into the container
+Copy the `ssh` command to your terminal, and you should be able to SSH into the container
 to investigate the problem.
 
-### Tip: getting the environment of the pipeline script
-
-It can be very useful to set the environment variables to those of the pipeline
-script. You can try this:
-
-```
-. <(xargs -0 bash -c 'printf "export %q\n" "$@"' -- < /proc/$(pgrep -f 'python3 -')/environ)
-```
-
-(This is based on [this](https://unix.stackexchange.com/a/125127) answer. For 
-the process ID, we look for a process containing `python3 -`, which runs `ssh_to_pipeline.py`.)
+It may be useful to copy the second command once you're connected. It will change
+the working directory to that of the pipeline, and copy all environment variables
+from the pipeline.

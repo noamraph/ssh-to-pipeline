@@ -88,8 +88,20 @@ def start_ssh_server(ngrok_token: str) -> None:
                     m = re.match(r"^tcp://(.+):(\d+)$", url)
                     assert m is not None
                     host, port = m.groups()
+                    env_cmd = f"""cd {os.getcwd()}; . <(xargs -0 bash -c 'printf "export %q\\n" "$@"' -- < /proc/{os.getpid()}/environ)"""
                     print(
-                        f"\n\nTunnel started. To connect, run:\n\nssh -p {port} root@{host}\n\n\n",
+                        f"\n"
+                        f"\n"
+                        f"Tunnel started. To connect, run:\n"
+                        f"\n"
+                        f"ssh -p {port} root@{host}\n"
+                        f"\n"
+                        f"\n"
+                        f"Tip: to get the environment of the pipeline, run this in the SSH session:\n"
+                        f"\n"
+                        f"{env_cmd}\n"
+                        f"\n"
+                        f"\n",
                         flush=True,
                     )
         # If ngrok exited, close sshd
