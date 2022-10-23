@@ -42,5 +42,5 @@ script. You can try this:
 . <(xargs -0 bash -c 'printf "export %q\n" "$@"' -- < /proc/$(pgrep -f 'python3 -')/environ)
 ```
 
-(This is based on [This](https://unix.stackexchange.com/a/125127) answer. For 
+(This is based on [this](https://unix.stackexchange.com/a/125127) answer. For 
 the process ID, we look for a process containing `python3 -`, which runs `ssh_to_pipeline.py`.)
