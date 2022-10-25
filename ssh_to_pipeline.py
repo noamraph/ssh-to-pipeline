@@ -63,6 +63,25 @@ def fix_bitbucket_tty() -> None:
         )
 
 
+def add_copyenv_script() -> None:
+    env_cmd = (
+        f"cd {os.getcwd()}; "
+        f""". <(xargs -0 bash -c 'printf "export %q\\n" "$@"' -- < /proc/{os.getpid()}/environ)\n""")
+    Path('/tmp/copyenv').write_text(env_cmd)
+
+    with open('/etc/motd', 'a') as f:
+        f.write(
+            "\n"
+            "\n"
+            "=======================================================\n"
+            "To copy the environment from the pipeline process, run:\n"
+            "\n"
+            "source /tmp/copyenv\n"
+            "=======================================================\n"
+            "\n"
+        )
+
+
 def start_ssh_server(ngrok_token: str) -> None:
     check_call(["ngrok", "config", "add-authtoken", ngrok_token])
     run_sshd = Path("/run/sshd")
@@ -92,7 +111,7 @@ def start_ssh_server(ngrok_token: str) -> None:
                     m = re.match(r"^tcp://(.+):(\d+)$", url)
                     assert m is not None
                     host, port = m.groups()
-                    env_cmd = f"""cd {os.getcwd()}; . <(xargs -0 bash -c 'printf "export %q\\n" "$@"' -- < /proc/{os.getpid()}/environ)"""
+
                     print(
                         f"\n"
                         f"\n"
@@ -101,9 +120,9 @@ def start_ssh_server(ngrok_token: str) -> None:
                         f"ssh -p {port} root@{host}\n"
                         f"\n"
                         f"\n"
-                        f"Tip: to get the environment of the pipeline, run this in the SSH session:\n"
+                        f"Tip: to copy the environment from the pipeline, run this in the SSH session:\n"
                         f"\n"
-                        f"{env_cmd}\n"
+                        f"source /tmp/copyenv\n"
                         f"\n"
                         f"\n",
                         flush=True,
@@ -128,6 +147,8 @@ def ssh_to_pipeline() -> None:
     install_packages()
 
     fix_bitbucket_tty()
+
+    add_copyenv_script()
 
     start_ssh_server(ngrok_token)
 
