@@ -31,9 +31,7 @@ def install_packages() -> None:
         ["curl", "-s", "https://ngrok-agent.s3.amazonaws.com/ngrok.asc"],
         encoding="ascii",
     )
-    Path("/etc/apt/trusted.gpg.d").mkdir(parents=True, exist_ok=True)
     Path("/etc/apt/trusted.gpg.d/ngrok.asc").write_text(ngrok_asc)
-    Path("/etc/apt/sources.list.d").mkdir(parents=True, exist_ok=True)
     Path("/etc/apt/sources.list.d/ngrok.list").write_text(
         "deb https://ngrok-agent.s3.amazonaws.com buster main\n"
     )
