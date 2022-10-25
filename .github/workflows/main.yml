@@ -1,5 +1,5 @@
 name: Run ssh_to_pipeline.py
-on: []
+on: [workflow_dispatch]
 jobs:
   run-ssh-to-pipeline:
     runs-on: ubuntu-latest
