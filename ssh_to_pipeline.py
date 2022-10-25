@@ -11,6 +11,10 @@ from subprocess import PIPE, Popen, check_call, check_output
 
 
 def update_authorized_keys() -> None:
+    # I have seen sshd refuse to accept the public key because the home directory
+    # was writable by others.
+    check_call("chmod go-w ~", shell=True)
+
     authorized_keys = Path("~/.ssh/authorized_keys").expanduser()
     ssh_pubkey = os.environ.get("SSH_PUBKEY")
     if ssh_pubkey is not None:
