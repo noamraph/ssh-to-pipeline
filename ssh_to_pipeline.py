@@ -7,7 +7,8 @@ import json
 import os
 import re
 from pathlib import Path
-from subprocess import PIPE, Popen, check_call, check_output
+from subprocess import PIPE, Popen, check_call
+from getpass import getuser
 
 
 def update_authorized_keys() -> None:
@@ -24,33 +25,23 @@ def update_authorized_keys() -> None:
         authorized_keys.chmod(0o644)
     if not authorized_keys.exists():
         raise RuntimeError(
-            "SSH_PUBKEY is not defined and ~/.ssh/authorized_keys file doesn't exist. "
-            "You won't be able to SSH into the container."
+            f"SSH_PUBKEY is not defined and {authorized_keys} file doesn't exist. "
+            f"You won't be able to SSH into the container."
         )
 
 
 def install_packages() -> None:
-    # Based on linux installation instructions at https://ngrok.com/docs/getting-started
-    ngrok_asc = check_output(
-        ["curl", "-s", "https://ngrok-agent.s3.amazonaws.com/ngrok.asc"],
-        encoding="ascii",
-    )
-    Path("/etc/apt/trusted.gpg.d/ngrok.asc").write_text(ngrok_asc)
-    Path("/etc/apt/sources.list.d/ngrok.list").write_text(
-        "deb https://ngrok-agent.s3.amazonaws.com buster main\n"
-    )
-    check_call(["apt-get", "-q", "update"])
+    check_call(["sudo", "apt-get", "-q", "update"])
     check_call(
-        [
-            "apt-get",
-            "-q",
-            "install",
-            "-y",
-            "--no-install-recommends",
-            "ngrok",
-            "openssh-server",
-        ]
+        ["sudo", "apt-get", "-q", "install", "-y", "--no-install-recommends", "curl", "gpg"]
     )
+    # Based on linux installation instructions at https://ngrok.com/docs/getting-started
+    # Instead of using /etc/apt/trusted.gpg.d, which seems deprecated and isn't
+    # supported by GitHub actions, we use what's described here:
+    # https://github.com/docker/docs/issues/11625#issuecomment-751388087
+    check_call("curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | gpg --dearmor | sudo tee /usr/share/keyrings/ngrok.gpg > /dev/null", shell=True)
+    check_call('echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ngrok.gpg] https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list > /dev/null', shell=True)
+    check_call("sudo apt-get -q update && sudo apt-get -q install -y --no-install-recommends ngrok openssh-server", shell=True)
 
 
 def fix_bitbucket_tty() -> None:
@@ -66,10 +57,11 @@ def fix_bitbucket_tty() -> None:
 def add_copyenv_script() -> None:
     env_cmd = (
         f"cd {os.getcwd()}; "
-        f""". <(xargs -0 bash -c 'printf "export %q\\n" "$@"' -- < /proc/{os.getpid()}/environ)\n""")
-    Path('/tmp/copyenv').write_text(env_cmd)
+        f""". <(xargs -0 bash -c 'printf "export %q\\n" "$@"' -- < /proc/{os.getpid()}/environ)\n"""
+    )
+    Path("/tmp/copyenv").write_text(env_cmd)
 
-    with open('/etc/motd', 'a') as f:
+    with open("/etc/motd", "a") as f:
         f.write(
             "\n"
             "\n"
@@ -89,9 +81,10 @@ def start_ssh_server(ngrok_token: str) -> None:
     ROOT_UID = 0
     os.chown(run_sshd, ROOT_UID, ROOT_UID)
     run_sshd.chmod(0o755)
-    with Popen(["/usr/sbin/sshd", "-D"]) as sshd:
+    # Hint: replace "-D" with "-d" to get sshd to print debug info.
+    with Popen(["/usr/sbin/sshd", "-d", "-o", "Port=2222"]) as sshd:
         with Popen(
-            "ngrok tcp 22 --log=stdout --log-format=json | tee /dev/stderr",
+            "ngrok tcp 2222 --log=stdout --log-format=json | tee /dev/stderr",
             shell=True,
             stdout=PIPE,
             bufsize=0,
@@ -113,18 +106,18 @@ def start_ssh_server(ngrok_token: str) -> None:
                     host, port = m.groups()
 
                     print(
-                        f"\n"
-                        f"\n"
+                        f" \n"
+                        f" \n"
                         f"Tunnel started. To connect, run:\n"
-                        f"\n"
-                        f"ssh -p {port} root@{host}\n"
-                        f"\n"
-                        f"\n"
+                        f" \n"
+                        f"ssh -p {port} {getuser()}@{host}\n"
+                        f" \n"
+                        f" \n"
                         f"Tip: to copy the environment from the pipeline, run this in the SSH session:\n"
-                        f"\n"
+                        f" \n"
                         f"source /tmp/copyenv\n"
-                        f"\n"
-                        f"\n",
+                        f" \n"
+                        f" \n",
                         flush=True,
                     )
         # If ngrok exited, close sshd

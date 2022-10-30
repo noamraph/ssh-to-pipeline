@@ -30,14 +30,14 @@ Tunnel started. To connect, run:
 ssh -p 14169 root@0.tcp.eu.ngrok.io
 
 
-Tip: to get the environment of the pipeline, run this in the SSH session:
+Tip: to copy the environment from the pipeline, run this in the SSH session:
 
-cd /opt/atlassian/bitbucketci/agent/build; . <(xargs -0 bash -c 'printf "export %q\n" "$@"' -- < /proc/131/environ)
+source /tmp/copyenv
 ```
 
 Copy the `ssh` command to your terminal, and you should be able to SSH into the container
 to investigate the problem.
 
-It may be useful to copy the second command once you're connected. It will change
+It may be useful to run `source /tmp/copyenv` once you're connected. It will change
 the working directory to that of the pipeline, and copy all environment variables
 from the pipeline.
